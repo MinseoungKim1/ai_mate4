@@ -80,7 +80,7 @@ exports.login = async (req, res) => {
 // 2. 최종 회원가입 완료
 exports.completeSignup = async (req, res) => {
   try {
-    const { email, nickname, gender, age, kakaoId } = req.body;
+    const { email, nickname, gender, age, kakaoId, password } = req.body;
 
     if (!email || !nickname || !gender || !age) {
       return res.status(400).json({ success: false, message: "모든 정보를 입력해주세요." });
@@ -93,18 +93,6 @@ exports.completeSignup = async (req, res) => {
       return res.status(400).json({ success: false, message: "이미 가입된 이메일입니다." });
     }
 
-    // const newUser = {
-    //   id: users.length + 1,
-    //   email,
-    //   nickname,
-    //   gender,
-    //   age: Number(age),
-    //   matchCount: 0,
-    //   aiMatchCount: 0,
-    //   password: "social_login",
-    //   createdAt: new Date()
-    // };
-
     // 실제 DB 삽입
     const newUser = await User.create({
       email,
@@ -114,7 +102,7 @@ exports.completeSignup = async (req, res) => {
       kakaoId: kakaoId || null,
       matchCount: 1,
       aiMatchCount: 1,
-      password: "social_login", // 소셜 로그인은 비밀번호 없음
+      password,
       isPro: false
     });
 
