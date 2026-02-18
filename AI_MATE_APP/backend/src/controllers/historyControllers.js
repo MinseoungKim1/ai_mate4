@@ -7,9 +7,12 @@ exports.getHistories = async (req, res) => {
     const data = await historyService.getUserHistories(email);
     res.status(200).json({ success: true, data });
   } catch (error) {
+    if (error.message === "USER_NOT_FOUND") {
+      return res.status(404).json({ success: false, message: "사용자를 찾을 수 없습니다." });
+    }
     res
-      .status(500)
-      .json({ success: false, message: "기록을 불러오지 못했습니다." });
+        .status(500)
+        .json({ success: false, message: "기록을 불러오지 못했습니다." });
   }
 };
 
@@ -20,9 +23,12 @@ exports.getChatDetail = async (req, res) => {
     const messages = await historyService.getChatDetail(id);
     res.status(200).json({ success: true, data: messages });
   } catch (error) {
+    if (error.message === "CHAT_NOT_FOUND") {
+      return res.status(404).json({ success: false, message: "대화를 찾을 수 없습니다." });
+    }
     res
-      .status(500)
-      .json({ success: false, message: "대화 상세 내역 로드 실패" });
+        .status(500)
+        .json({ success: false, message: "대화 상세 내역 로드 실패" });
   }
 };
 
@@ -33,9 +39,13 @@ exports.deleteHistory = async (req, res) => {
     await historyService.deleteHistory(id);
     res.status(200).json({ success: true, message: "삭제 완료" });
   } catch (error) {
+    if (error.message === "CHAT_NOT_FOUND") {
+      return res.status(404).json({ success: false, message: "대화를 찾을 수 없습니다." });
+    }
     res.status(500).json({ success: false, message: "삭제 실패" });
   }
 };
+
 // 🤖 AI 대화 분석 추가
 exports.analyzeHistory = async (req, res) => {
   try {
