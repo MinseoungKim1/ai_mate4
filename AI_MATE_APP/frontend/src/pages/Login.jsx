@@ -10,7 +10,7 @@ const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
   const [tempUser, setTempUser] = useState(null);
-
+  const [isSocial, setIsSocial] = useState(false);  //소셜/일반 구분
   const isProcessing = useRef(false);
 
   // 입력 필드 상태
@@ -32,11 +32,12 @@ const Login = () => {
     }
   }, [navigate]);
 
-  // 💡 [수정] 일반 회원가입 버튼 클릭 시 호출
+    // 💡 [수정] 일반 회원가입으로 전환하는 함수
   const handleGeneralSignup = () => {
     setIsNewUser(true);
     setIsSocial(false); // 일반 가입임을 명시
-    // 모든 필드 초기화
+    setIsLogin(false);
+    // 필드 초기화
     setEmail("");
     setPassword("");
     setNickname("");
@@ -53,9 +54,7 @@ const Login = () => {
     return `https://kauth.kakao.com/oauth/authorize?client_id=${REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code&prompt=select_account`;
   };
 
-  const createUser = () => {
-
-  };
+  
 
 
 
@@ -104,6 +103,48 @@ const Login = () => {
   };
 
   // 3. 카카오 인증 후 콜백 처리
+  // useEffect(() => {
+  //   const params = new URLSearchParams(window.location.search);
+  //   const code = params.get("code");
+
+  //   if (code && !isProcessing.current) {
+  //     isProcessing.current = true;
+  //     window.history.replaceState({}, null, window.location.pathname);
+
+  //     fetch(`${API_URL}/api/auth/kakao`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ code }),
+  //     })
+  //       .then((res) => {
+  //         if (!res.ok)
+  //           return res.json().then((err) => {
+  //             throw new Error(err.message);
+  //           });
+  //         return res.json();
+  //       })
+  //       .then((data) => {
+  //         if (data.isNewUser) {
+  //           setIsNewUser(true);
+  //           setTempUser(data.user);
+  //           setNickname(data.user.nickname);
+  //         } else {
+  //           localStorage.setItem("token", data.token);
+  //           localStorage.setItem("nickname", data.user.nickname);
+  //           localStorage.setItem("userEmail", data.user.email); // 🔒 인증 키 저장
+  //           navigate("/home");
+  //         }
+  //       })
+  //       .catch((err) => {
+  //         console.error("로그인 에러:", err.message);
+  //         isProcessing.current = false;
+  //         setModal({
+  //           open: true,
+  //           message: `로그인 중 오류가 발생했습니다: ${err.message}`,
+  //         });
+  //       });
+  //   }
+  // }, [navigate]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
@@ -117,72 +158,30 @@ const Login = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       })
-        .then((res) => {
-          if (!res.ok)
-            return res.json().then((err) => {
-              throw new Error(err.message);
-            });
-          return res.json();
-        })
-        .then((data) => {
-          if (data.isNewUser) {
-            setIsNewUser(true);
-            setTempUser(data.user);
-            setNickname(data.user.nickname);
-          } else {
-            localStorage.setItem("token", data.token);
-            localStorage.setItem("nickname", data.user.nickname);
-            localStorage.setItem("userEmail", data.user.email); // 🔒 인증 키 저장
-            navigate("/home");
-          }
-        })
-        .catch((err) => {
-          console.error("로그인 에러:", err.message);
-          isProcessing.current = false;
-          setModal({
-            open: true,
-            message: `로그인 중 오류가 발생했습니다: ${err.message}`,
-          });
-        });
-    }
-  }, [navigate]);
-
-  // 4. 카카오 신규 유저 최종 가입 처리
-  const handleExtraSignup = async () => {
-    if (!email || !gender || !age) {
-      setModal({
-        open: true,
-        message: "이메일, 성별, 나이를 모두 입력해주세요.",
-      });
-      return;
-    }
-
-    const finalData = {
-      ...tempUser,
-      email,
-      nickname,
-      gender,
-      age: Number(age),
-    };
-
-    fetch(`${API_URL}/api/auth/signup-complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(finalData),
-    })
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) {
+        if (data.isNewUser) {
+          // 💡 신규 유저: 추가 정보 입력 페이지로 이동
+          setIsNewUser(true);
+          setIsSocial(true); // 💡 소셜 가입 상태로 전환
+          setTempUser(data.user);
+          setNickname(data.user.nickname);
+          setEmail(data.user.email || ""); // 카카오 이메일이 있다면 자동 세팅
+        } else {
+          // 💡 기존 유저: 즉시 로그인 처리
           localStorage.setItem("token", data.token);
           localStorage.setItem("nickname", data.user.nickname);
-          localStorage.setItem("userEmail", data.user.email); // 🔒 인증 키 저장
+          localStorage.setItem("userEmail", data.user.email);
           navigate("/home");
-        } else {
-          setModal({ open: true, message: data.message });
         }
       })
-      .catch((err) => console.error("가입 완료 통신 에러:", err));
-  };
+      .catch((err) => {
+        console.error("로그인 에러:", err.message);
+        isProcessing.current = false;
+        setModal({ open: true, message: "로그인 중 오류가 발생했습니다." });
+      });
+    }
+  }, [navigate]);
 
   // 💡 [수정] 최종 가입 처리 (일반/소셜 통합)
   const handleFinalSignup = async () => {
@@ -249,75 +248,95 @@ const Login = () => {
         </header>
 
         {isNewUser ? (
-          <div style={formStyle}>
-            <h2 style={signupTitleStyle}>반가워요! 정보를 완성해주세요</h2>
+  <div style={formStyle}>
+    <h2 style={signupTitleStyle}>
+      {isSocial ? "카카오 가입을 완료해주세요" : "정보를 입력하고 가입을 완료하세요"}
+    </h2>
 
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>이메일</label>
-              <input
-                type="email"
-                placeholder="연락 가능한 이메일을 입력하세요"
-                style={inputStyle}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={(e) => checkEmailDuplicate(e.target.value)} // 💡 포커스 아웃 시 중복 체크
-                required
-              />
-            </div>
+    <div style={inputGroupStyle}>
+      <label style={labelStyle}>이메일</label>
+      <input
+        type="email"
+        placeholder="연락 가능한 이메일을 입력하세요"
+        style={inputStyle}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        onBlur={(e) => checkEmailDuplicate(e.target.value)}
+        required
+      />
+    </div>
 
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>닉네임 (카카오 제공)</label>
-              <input
-                type="text"
-                style={{
-                  ...inputStyle,
-                  backgroundColor: "#f9f9f9",
-                  color: "#888",
-                }}
-                value={nickname}
-                readOnly
-              />
-            </div>
+    {/* 💡 [수정] 카카오/일반 공통으로 비밀번호 입력 필드 노출 */}
+    <div style={inputGroupStyle}>
+      <label style={labelStyle}>비밀번호 설정</label>
+      <input
+        type="password"
+        placeholder="사용하실 비밀번호를 입력하세요"
+        style={inputStyle}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+    </div>
 
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>성별</label>
-              <div style={selectionGridStyle}>
-                {["male", "female"].map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setGender(g)}
-                    style={{
-                      ...selectionButtonStyle,
-                      backgroundColor: gender === g ? "#ff4d4d" : "#fff",
-                      color: gender === g ? "#fff" : "#888",
-                      border:
-                        gender === g ? "1px solid #ff4d4d" : "1px solid #eee",
-                    }}
-                  >
-                    {g === "male" ? "남성" : "여성"}
-                  </button>
-                ))}
-              </div>
-            </div>
+    {/* 💡 [수정] 닉네임 필드: 일반 가입 시 자유 입력 가능하도록 설정 */}
+    <div style={inputGroupStyle}>
+      <label style={labelStyle}>
+        닉네임 {isSocial ? "(카카오 제공)" : "(직접 입력)"}
+      </label>
+      <input
+        type="text"
+        placeholder="사용하실 닉네임을 입력하세요"
+        style={{
+          ...inputStyle,
+          backgroundColor: isSocial ? "#f9f9f9" : "#fff",
+          color: isSocial ? "#888" : "#000",
+        }}
+        value={nickname}
+        onChange={(e) => setNickname(e.target.value)}
+        readOnly={isSocial} // 소셜 가입 시 닉네임을 고정하고 싶다면 true, 수정 허용 시 false
+      />
+    </div>
 
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>정확한 나이</label>
-              <input
-                type="number"
-                placeholder="예: 25"
-                style={inputStyle}
-                value={age}
-                min="0"
-                onChange={handleAgeChange}
-              />
-            </div>
+    <div style={inputGroupStyle}>
+      <label style={labelStyle}>성별</label>
+      <div style={selectionGridStyle}>
+        {["male", "female"].map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => setGender(g)}
+            style={{
+              ...selectionButtonStyle,
+              backgroundColor: gender === g ? "#ff4d4d" : "#fff",
+              color: gender === g ? "#fff" : "#888",
+              border: gender === g ? "1px solid #ff4d4d" : "1px solid #eee",
+            }}
+          >
+            {g === "male" ? "남성" : "여성"}
+          </button>
+        ))}
+      </div>
+    </div>
 
-            <button onClick={handleExtraSignup} style={buttonStyle}>
-              가입 완료하고 시작하기
-            </button>
-          </div>
-        ) : (
+    <div style={inputGroupStyle}>
+      <label style={labelStyle}>정확한 나이</label>
+      <input
+        type="number"
+        placeholder="예: 25"
+        style={inputStyle}
+        value={age}
+        min="0"
+        onChange={handleAgeChange}
+      />
+    </div>
+
+    {/* 💡 모든 가입은 handleFinalSignup에서 통합 처리 */}
+    <button onClick={handleFinalSignup} style={buttonStyle}>
+      가입 완료하고 시작하기
+    </button>
+  </div>
+) : (
           <>
             <form onSubmit={handleSubmit} style={formStyle}>
               <div style={inputGroupStyle}>
@@ -374,7 +393,7 @@ const Login = () => {
 
             <p
               style={toggleTextStyle}
-              onClick={() => (window.location.href = getKakaoAuthUrl())}
+               onClick={handleGeneralSignup} // 💡 카카오가 아닌 일반 가입 폼으로 연결
             >
               아직 계정이 없으신가요?{" "}
               <span style={highlightStyle}>회원가입</span>
