@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 export const useChat = () => {
   const [loading, setLoading] = useState(false);
@@ -9,7 +10,7 @@ export const useChat = () => {
     setLoading(true);
     try {
       // Express 서버(포트 3000번 가정)로 메시지 전송
-      const response = await axios.post('http://localhost:3000/api/chat', {
+      const response = await axios.post(`${API_URL}/api/chat`, {
         message: message,
       });
       return response.data; // 서버에서 준 AI의 답장 { aiText: "..." }

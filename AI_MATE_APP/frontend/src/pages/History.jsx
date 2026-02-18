@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 import ConfirmModal from "../components/ConfirmModal";
+import { API_URL } from "../config";
 
 const History = () => {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ const History = () => {
       try {
         setLoading(true);
         const userEmail = localStorage.getItem("userEmail");
-        const response = await fetch("http://localhost:3000/api/history/list", {
+        const response = await fetch(`${API_URL}/api/history/list`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),
@@ -54,7 +55,7 @@ const History = () => {
   const handleConfirmDelete = async () => {
     try {
       const id = deleteModal.targetId;
-      const response = await fetch(`http://localhost:3000/api/history/${id}`, {
+      const response = await fetch(`${API_URL}/api/history/${id}`, {
         method: "DELETE",
       }).then((res) => res.json());
 

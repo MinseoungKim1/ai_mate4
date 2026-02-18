@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Send, BarChart2 } from "lucide-react";
+import { io } from "socket.io-client";
+import { API_URL } from "../config";
 import ProModal from "../components/ProModal";
 import AnalyzeModal from "../components/AnalyzeModal";
 
+let socket;
+
 const AiChatRoom = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { tags = [], age = "" } = location.state || {}; // 💡 IdealSelect에서 넘어온 정보
+
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [turnCount, setTurnCount] = useState(0);
@@ -28,7 +35,7 @@ const AiChatRoom = () => {
     const fetchUserStatus = async () => {
       try {
         const userEmail = localStorage.getItem("userEmail");
-        const response = await fetch("http://localhost:3000/api/user/status", {
+        const response = await fetch(`${API_URL}/api/user/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),
@@ -44,6 +51,19 @@ const AiChatRoom = () => {
     };
 
     fetchUserStatus();
+
+    if (socket) socket.disconnect();
+    socket = io(API_URL);
+
+    socket.on("receive-ai-message", (data) => {
+      setMessages((prev) => [...prev, { ...data, id: Date.now() }]);
+      setIsAiTyping(false);
+    });
+
+    socket.on("error", (data) => {
+      alert(data.message);
+      setIsAiTyping(false);
+    });
 
     if (isInitialized.current) return;
     isInitialized.current = true;
@@ -80,6 +100,10 @@ const AiChatRoom = () => {
         (index + 1) * 900,
       );
     });
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
   }, [nickname]);
 
   useEffect(() => {
@@ -89,21 +113,21 @@ const AiChatRoom = () => {
 
   const handleSend = () => {
     if (!inputText.trim() || isAiTyping) return;
+
     const userMsg = { id: Date.now(), sender: "me", text: inputText };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+
+    setMessages(newMessages);
     setInputText("");
     setTurnCount((prev) => prev + 1);
-
     setIsAiTyping(true);
-    setTimeout(() => {
-      const aiMsg = {
-        id: Date.now() + 1,
-        sender: "other",
-        text: `${inputText}라고 하셨군요! 더 자세히 듣고 싶어요.`,
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-      setIsAiTyping(false);
-    }, 1500);
+
+    // AI에게 대화 기록 전달 (시스템 메시지 제외)
+    const chatHistory = newMessages.filter(m => m.sender === "me" || m.sender === "other");
+    socket.emit("send-ai-message", {
+      messages: chatHistory,
+      context: { tags, age } // 💡 이상형 정보를 함께 전달
+    });
   };
 
   // 💡 [핵심 수정] 3. 분석 버튼 클릭 시 조건 체크
@@ -129,7 +153,7 @@ const AiChatRoom = () => {
       setIsSubmitting(true);
       const userEmail = localStorage.getItem("userEmail");
       const response = await fetch(
-        "http://localhost:3000/api/user/match/ai/use",
+        `${API_URL}/api/user/match/ai/use`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

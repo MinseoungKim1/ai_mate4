@@ -10,6 +10,7 @@ import {
   Share2,
 } from "lucide-react";
 import BottomNav from "../components/BottomNav";
+import { API_URL } from "../config";
 
 const Analyze = () => {
   const navigate = useNavigate();
@@ -29,36 +30,57 @@ const Analyze = () => {
     ],
   };
 
-  // 💡 수정된 로직: 차감 요청이 아닌 '상태 조회'만 수행
-  useEffect(() => {
-    const fetchLatestStatus = async () => {
-      try {
-        // 1. 시각적인 분석 연출 (2초)
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+  const [analysis, setAnalysis] = useState(null);
 
-        // 2. 서버에서 차감된 후의 '최신 상태'만 가져옴
-        const userEmail = localStorage.getItem("userEmail");
-        const response = await fetch("http://localhost:3000/api/user/status", {
+  useEffect(() => {
+    const fetchAnalysis = async () => {
+      try {
+        const locationState = window.history.state?.usr; // roomId passed from navigate
+        const roomId = locationState?.roomId;
+
+        if (!roomId) {
+          console.warn("Room ID not found, using test analysis.");
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch(`${API_URL}/api/history/analyze`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail }),
+          body: JSON.stringify({ roomId }),
         }).then((res) => res.json());
 
         if (response.success && response.data) {
-          // 💡 이미 AiChatRoom에서 차감되었으므로 최신 결과값만 세팅
-          setRemainingAiCount(response.data.aiMatchCount);
+          setAnalysis(response.data);
+
+          // Then fetch status for remaining count
+          const userEmail = localStorage.getItem("userEmail");
+          const statusRes = await fetch(`${API_URL}/api/user/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: userEmail }),
+          }).then((res) => res.json());
+
+          if (statusRes.success && statusRes.data) {
+            setRemainingAiCount(statusRes.data.aiMatchCount);
+          }
           setLoading(false);
         } else {
+          alert(response.message || "분석 실패");
           navigate("/home");
         }
       } catch (error) {
-        console.error("데이터 로드 중 오류 발생:", error);
+        console.error("분석 로드 중 오류 발생:", error);
         navigate("/home");
       }
     };
 
-    fetchLatestStatus();
+    fetchAnalysis();
   }, [navigate]);
+
+  // Use real analysis data or fallback
+  const displayData = analysis || analysisData;
+  const adviceText = analysis?.advice || "분석 결과가 없습니다.";
 
   if (loading) {
     return (
@@ -109,17 +131,17 @@ const Analyze = () => {
               분석 완료 (남은 AI권: {remainingAiCount}회)
             </div>
             <div style={scoreCircleStyle}>
-              <span style={scoreTextStyle}>{analysisData.totalScore}</span>
+              <span style={scoreTextStyle}>{displayData.totalScore}</span>
               <span style={scoreUnitStyle}>점</span>
             </div>
-            <h2 style={styleTitleStyle}>"{analysisData.style}"</h2>
-            <p style={styleDescStyle}>{analysisData.desc}</p>
+            <h2 style={styleTitleStyle}>"{displayData.style}"</h2>
+            <p style={styleDescStyle}>{displayData.desc}</p>
           </motion.div>
 
           {/* 2. 세부 능력치 그래프 영역 */}
           <div style={statsContainerStyle}>
             <h4 style={sectionTitleStyle}>상세 능력치</h4>
-            {analysisData.stats.map((stat) => (
+            {displayData.stats.map((stat) => (
               <div key={stat.label} style={statRowStyle}>
                 <div style={statLabelStyle}>
                   {stat.icon}
@@ -147,9 +169,7 @@ const Analyze = () => {
           >
             <div style={adviceTitleStyle}>💡 AI 코치의 한마디</div>
             <p style={adviceContentStyle}>
-              질문과 답변의 비율이 아주 이상적입니다! 다음 대화에서는 상대방의
-              취미에 대해 조금 더 깊게 질문해본다면 호감도가 더 빠르게 상승할 것
-              같아요.
+              {adviceText}
             </p>
           </motion.div>
         </div>

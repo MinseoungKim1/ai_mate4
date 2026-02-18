@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
+import { API_URL } from "../config";
 
 const HistoryChatRoom = () => {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ const HistoryChatRoom = () => {
       try {
         setLoading(true);
         const response = await fetch(
-          `http://localhost:3000/api/history/detail/${chatId}`,
+          `${API_URL}/api/history/detail/${chatId}`,
         ).then((res) => res.json());
 
         if (response.success) {

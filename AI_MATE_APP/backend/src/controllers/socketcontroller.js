@@ -38,6 +38,33 @@ module.exports = (io, socket) => {
     socket.to(roomId).emit("receive-message", { text, sender: "other" });
   });
 
+  // 🤖 2-1. AI 메시지 처리
+  socket.on("send-ai-message", async ({ messages, context }) => {
+    try {
+      const aiService = require("../services/aiService");
+
+      // 💡 messages 형식: [{role: 'user', content: '...'}, {role: 'assistant', content: '...'}, ...]
+      // frontend에서 보낼 때 sender: 'me' -> role: 'user', sender: 'other' -> role: 'assistant' 로 변환해서 보내거나
+      // 여기서 변환해줘야 함. 여기서는 frontend에서 OpenAI format으로 보내준다고 가정하거나 변환함.
+
+      const openAiMessages = messages.map(msg => ({
+        role: msg.sender === "me" ? "user" : "assistant",
+        content: msg.text
+      }));
+
+      const aiResponse = await aiService.getAiResponse(openAiMessages, "chat", context);
+
+      socket.emit("receive-ai-message", {
+        text: aiResponse,
+        sender: "other",
+        id: Date.now()
+      });
+    } catch (error) {
+      console.error("AI Chat Error:", error);
+      socket.emit("error", { message: "AI 대화 중 오류가 발생했습니다." });
+    }
+  });
+
   // 💡 3. 명시적으로 방을 나갈 때 (뒤로가기 등)
   socket.on("leave-room", ({ roomId }) => {
     if (roomId) {

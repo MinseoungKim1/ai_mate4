@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Sparkles, UserCircle, Zap, Heart } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 import ConfirmModal from "../components/ConfirmModal";
+import { API_URL } from "../config";
 
 const MainHome = () => {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ const MainHome = () => {
         setLoading(true);
         const userEmail = localStorage.getItem("userEmail");
 
-        const response = await fetch("http://localhost:3000/api/user/status", {
+        const response = await fetch(`${API_URL}/api/user/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),

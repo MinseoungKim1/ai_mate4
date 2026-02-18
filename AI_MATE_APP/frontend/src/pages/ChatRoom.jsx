@@ -5,6 +5,7 @@ import { ChevronLeft, Send, BarChart2, Loader2, LogOut } from "lucide-react";
 import { io } from "socket.io-client";
 import ProModal from "../components/ProModal";
 import AnalyzeModal from "../components/AnalyzeModal";
+import { API_URL } from "../config";
 
 let socket;
 
@@ -32,7 +33,7 @@ const ChatRoom = () => {
     const fetchUserStatus = async () => {
       try {
         const userEmail = localStorage.getItem("userEmail");
-        const response = await fetch("http://localhost:3000/api/user/status", {
+        const response = await fetch(`${API_URL}/api/user/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),
@@ -50,7 +51,7 @@ const ChatRoom = () => {
     fetchUserStatus();
 
     if (socket) socket.disconnect();
-    socket = io("http://localhost:3000");
+    socket = io(API_URL);
     const userEmail = localStorage.getItem("userEmail");
 
     socket.emit("join-room", { email: userEmail });

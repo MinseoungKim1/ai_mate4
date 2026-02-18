@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import MessageModal from "../components/MessageModal";
 import kakaoLogo from "../assets/kakao_logo.svg";
 import googleLogo from "../assets/google_logo.svg";
+import { API_URL } from "../config";
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -44,7 +45,7 @@ const Login = () => {
   };
 
 
-  
+
   // 💡 카카오 로그인/가입 공용 URL 생성 함수
   const getKakaoAuthUrl = () => {
     const REST_API_KEY = "d1136ff6bbe22d5550a2338dbdc3e9e4";
@@ -64,7 +65,7 @@ const Login = () => {
 
     try {
       const response = await fetch(
-        "http://localhost:3000/api/auth/check-email",
+        `${API_URL}/api/auth/check-email`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -111,7 +112,7 @@ const Login = () => {
       isProcessing.current = true;
       window.history.replaceState({}, null, window.location.pathname);
 
-      fetch("http://localhost:3000/api/auth/kakao", {
+      fetch(`${API_URL}/api/auth/kakao`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
@@ -164,7 +165,7 @@ const Login = () => {
       age: Number(age),
     };
 
-    fetch("http://localhost:3000/api/auth/signup-complete", {
+    fetch(`${API_URL}/api/auth/signup-complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(finalData),
@@ -182,7 +183,7 @@ const Login = () => {
       })
       .catch((err) => console.error("가입 완료 통신 에러:", err));
   };
-  
+
   // 💡 [수정] 최종 가입 처리 (일반/소셜 통합)
   const handleFinalSignup = async () => {
     if (!email || !nickname || !gender || !age || (!isSocial && !password)) {
@@ -190,9 +191,9 @@ const Login = () => {
       return;
     }
 
-    const endpoint = isSocial 
-      ? "http://localhost:3000/api/auth/signup-complete" 
-      : "http://localhost:3000/api/auth/register"; // 일반 가입 API 주소 확인 필요
+    const endpoint = isSocial
+      ? `${API_URL}/api/auth/signup-complete`
+      : `${API_URL}/api/auth/register`; // 일반 가입 API 주소 확인 필요
 
     const finalData = {
       ...(isSocial ? tempUser : {}),

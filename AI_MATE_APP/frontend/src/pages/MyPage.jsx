@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import ConfirmModal from "../components/ConfirmModal";
 import BottomNav from "../components/BottomNav";
+import { API_URL } from "../config";
 
 const MyPage = () => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ const MyPage = () => {
       try {
         setLoading(true);
         const userEmail = localStorage.getItem("userEmail");
-        const response = await fetch("http://localhost:3000/api/user/status", {
+        const response = await fetch(`${API_URL}/api/user/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),

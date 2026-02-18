@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import { API_URL } from "../config";
 
 export const usePayment = () => {
   const [points, setPoints] = useState(0);
@@ -8,7 +9,7 @@ export const usePayment = () => {
   // 현재 포인트 및 구독 정보 조회
   const fetchBalance = async () => {
     const response = await axios.get(
-      "http://localhost:3000/api/payment/balance",
+      `${API_URL}/api/payment/balance`,
     );
     setPoints(response.data.points);
     setIsSubscribed(response.data.isSubscribed);
@@ -18,7 +19,7 @@ export const usePayment = () => {
   const useMatchingPoint = async () => {
     try {
       const response = await axios.post(
-        "http://localhost:3000/api/payment/use-match",
+        `${API_URL}/api/payment/use-match`,
       );
       if (response.data.success) {
         setPoints(response.data.remainingPoints);
@@ -34,7 +35,7 @@ export const usePayment = () => {
   const rechargePoints = async (planId) => {
     try {
       const response = await axios.post(
-        "http://localhost:3000/api/payment/recharge",
+        `${API_URL}/api/payment/recharge`,
         { planId },
       );
       alert("결제가 완료되었습니다!");
