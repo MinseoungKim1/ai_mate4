@@ -22,13 +22,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-*.package-lock.json
-PORT=3000
-
-
-# DB
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=ai_mate
-DB_USER=ai_mate
-DB_PASSWORD=1234
+package-lock.json
