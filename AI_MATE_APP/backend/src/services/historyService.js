@@ -71,7 +71,10 @@ exports.getChatDetail = async (chatId) => {
       ]
     });
 
-    // 3. 기존 프론트엔드 형식에 맞게 변환
+    console.log(messages);
+
+    // todo: 내가 보낸 메시지(me)와 상대가 보낸 메시지(other) 구분 필요
+    //  현재는 senderType으로 되어 있는데 senderId (email)로 찾아오거나 다른 값을 써줘야 할듯
     return messages.map(msg => ({
       id: msg.id,
       chatId: msg.chatRoomId,
@@ -202,8 +205,27 @@ exports.completeAppointment = async (chatId, appointmentDate) => {
   }
 };
 
+// 채팅방 생성 (실시간 매칭 시작)
+exports.createChatRoomIfNotExists = async (chatId, userInfo) => {
+  const existingRoom = await ChatRoom.findOne({ where: { id: chatId } });
+
+  if (!existingRoom) {
+    await ChatRoom.create({
+      id: chatId,
+      userId: userInfo.user1Id || null,
+      partnerId: userInfo.user2Id || null,
+      chatType: 'user',
+      partnerName: `${userInfo.user1Nickname} & ${userInfo.user2Nickname}`,
+      user1Email: userInfo.user1Email,
+      user2Email: userInfo.user2Email,
+      status: 'active'
+    });
+    console.log(`[NEW] ChatRoom 생성: ${chatId}`);
+  }
+};
+
 // 채팅방 생성 (AI 매칭 시작)
-exports.createChatRoom = async (email, aiProfileId) => {
+exports.createAiChatRoom = async (email, aiProfileId) => {
   try {
     const user = await User.findOne({ where: { email } });
     if (!user) {

@@ -57,9 +57,16 @@ const ChatRoom = () => {
     socket.emit("join-room", { email: userEmail });
 
     socket.on("match-success", (data) => {
+      console.log('match-success 받음:', data);
       roomIdRef.current = data.roomId;
       setCurrentRoomId(data.roomId);
-      setPartnerNickname(data.partnerNickname);
+      setPartnerNickname(data.partner.nickname);
+
+      socket.emit("join-chat-room", {
+        roomId: data.roomId,
+        email: userEmail
+      });
+
       setIsConnected(true);
 
       setMessages((prev) => {
@@ -69,16 +76,18 @@ const ChatRoom = () => {
           {
             id: "sys-connect",
             sender: "system",
-            text: `${data.partnerNickname}님과 연결되었습니다.`,
+            text: `${data.partner.nickname}님과 연결되었습니다.`,
           },
         ];
       });
     });
 
     socket.on("receive-message", (data) => {
+      const sender = data.senderEmail === userEmail ? "me" : "other";
+
       setMessages((prev) => [
         ...prev,
-        { id: Date.now(), sender: "other", text: data.text },
+        { id: Date.now(), sender: sender, text: data.text },
       ]);
     });
 
@@ -160,28 +169,28 @@ const ChatRoom = () => {
     if (!inputText.trim() || !isConnected || !currentRoomId) return;
 
     const text = inputText;
-    const msgData = { id: Date.now(), sender: "me", text };
-
-    setMessages((prev) => [...prev, msgData]);
+    // const msgData = { id: Date.now(), sender: "me", text };
+    //
+    // setMessages((prev) => [...prev, msgData]);
     setInputText("");
     setTurnCount((prev) => prev + 1);
 
     socket.emit("send-message", { roomId: currentRoomId, text });
 
-    try {
-      await fetch("http://localhost:3000/api/history/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: currentRoomId,
-          sender: "me",
-          text: text,
-          userEmail: localStorage.getItem("userEmail"),
-        }),
-      });
-    } catch (e) {
-      console.error("대화 저장 실패", e);
-    }
+    // try {
+    //   await fetch("http://localhost:3000/api/history/save", {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       chatId: currentRoomId,
+    //       sender: "me",
+    //       text: text,
+    //       userEmail: localStorage.getItem("userEmail"),
+    //     }),
+    //   });
+    // } catch (e) {
+    //   console.error("대화 저장 실패", e);
+    // }
   };
 
   const handleAnalyzeClick = () => {
