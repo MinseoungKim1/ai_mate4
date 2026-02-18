@@ -24,23 +24,31 @@ exports.getUserStatus = async (email) => {
 // 3. 일반 매칭권 차감 로직
 exports.useMatchCount = async (email) => {
   const user = await this.getUserByEmail(email);
+
+  // 💡 PRO 유저라면 차감 없이 현재 상태 반환
+  if (user.isPro) {
+    return this.getUserStatus(email);
+  }
+
   if (user.matchCount <= 0) throw new Error("NO_MATCH_COUNT");
 
-  // user.matchCount -= 1;
   await user.decrement("matchCount", { by: 1 });
-  // 차감 후의 최신 상태를 반환
-  await user.reload(); // DB에서 최신 데이터 다시 로드
+  await user.reload();
   return this.getUserStatus(email);
 };
 
 // 4. AI 매칭권 차감 로직
 exports.useAiMatchCount = async (email) => {
   const user = await this.getUserByEmail(email);
+
+  // 💡 PRO 유저라면 차감 없이 현재 상태 반환
+  if (user.isPro) {
+    return this.getUserStatus(email);
+  }
+
   if (user.aiMatchCount <= 0) throw new Error("NO_AI_MATCH_COUNT");
 
-  // user.aiMatchCount -= 1;
   await user.decrement("aiMatchCount", { by: 1 });
-  // 차감 후의 최신 상태를 반환
   await user.reload();
   return this.getUserStatus(email);
 };

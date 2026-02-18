@@ -24,12 +24,10 @@ app.use(express.json());
 const authRoutes = require("./src/routes/authRoutes");
 const userRoutes = require("./src/routes/userRoutes");
 const historyRoutes = require("./src/routes/historyRouters");
-const matchRoutes = require("./src/routes/matchRoute"); // 💡 추가한 매칭 라우트
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/history", historyRoutes);
-app.use("/api/user", matchRoutes); // /api/user/match/use 형태로 사용됨
 
 // 💡 실시간 소켓 컨트롤러 연결
 const socketController = require("./src/controllers/socketcontroller");
