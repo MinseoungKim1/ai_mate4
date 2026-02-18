@@ -11,9 +11,14 @@ exports.getStatus = async (req, res) => {
       data: status, // 서비스에서 정리해준 객체를 그대로 전달
     });
   } catch (error) {
+    if (error.message === "USER_NOT_FOUND") {
+      res
+          .status(404)
+          .json({ success: false, message: "유저를 찾을 수 없습니다." });
+    }
     res
-      .status(404)
-      .json({ success: false, message: "유저를 찾을 수 없습니다." });
+        .status(500)
+        .json({ success: false, message: "서버 오류가 발생했습니다." });
   }
 };
 
@@ -25,10 +30,17 @@ exports.useMatch = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "매칭권 사용 완료",
       data: updatedStatus,
     });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    if (error.message === "NO_MATCH_COUNT") {
+      res.status(400).json({ success: false, message: "매칭권이 부족합니다." });
+    }
+    if (error.message === "USER_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "유저를 찾을 수 없습니다." });
+    }
+    res.status(500).json({ success: false, message: "서버 오류가 발생했습니다." });
   }
 };
 
@@ -40,10 +52,17 @@ exports.useAiMatch = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "AI 매칭권 사용 완료",
       data: updatedStatus,
     });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    if (error.message === "NO_AI_MATCH_COUNT") {
+      res.status(400).json({ success: false, message: "AI 매칭권이 부족합니다." });
+    }
+    if (error.message === "USER_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "유저를 찾을 수 없습니다." });
+    }
+    res.status(500).json({ success: false, message: "서버 오류가 발생했습니다." });
   }
 };
 

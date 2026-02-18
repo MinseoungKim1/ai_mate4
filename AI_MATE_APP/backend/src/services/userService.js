@@ -1,56 +1,9 @@
-// 메모리 DB 공유
-const users = [
-  /**
-   * 유저 데이터 구조 설명:
-   * - id: 시스템 내부 고유 ID
-   * - email: 일반 가입 시 입력한 이메일 또는 카카오 가입 시 직접 입력한 이메일
-   * - password: 일반 가입 비밀번호 (소셜 로그인은 "social_login"으로 처리)
-   * - nickname: 카카오에서 가져온 닉네임 또는 일반 가입 닉네임
-   * - kakaoId: 카카오 API에서 제공하는 고유 식별 번호 (소셜 유저 전용)
-   * - gender/age: 회원가입 시 추가로 입력받은 정보
-   */
-  {
-    id: 1,
-    email: "test@test.com",
-    password: "1234",
-    nickname: "신석우",
-    gender: "male",
-    age: 25,
-    matchCount: 1000,
-    aiMatchCount: 1000,
-    kakaoId: 4754308892,
-    isPro: false, // 기본값
-  },
-  {
-    id: 2,
-    email: "alstjd9508@gmail.com",
-    password: "1234",
-    nickname: "김민성",
-    gender: "male",
-    age: 25,
-    matchCount: 10,
-    aiMatchCount: 5,
-    kakaoId: 4754006237, // 카카오에서 제공하는 고유 ID 숫자형식
-    isPro: false, // 기본값
-  },
-  {
-    id: 3,
-    email: "user@user.com",
-    password: "1234",
-    nickname: "아무개",
-    gender: "male",
-    age: 25,
-    matchCount: 1,
-    aiMatchCount: 1,
-    isPro: false, // 기본값
-  },
-];
-
-exports.users = users;
+const { User } = require("../models");
 
 // 1. 공통 유저 조회 함수
 exports.getUserByEmail = async (email) => {
-  const user = users.find((u) => u.email === email);
+  // const user = users.find((u) => u.email === email);
+  const user = await User.findOne({ where: { email } });
   if (!user) throw new Error("USER_NOT_FOUND");
   return user;
 };
@@ -66,13 +19,17 @@ exports.getUserStatus = async (email) => {
   };
 };
 
+// ==================== 매칭권 차감 로직 ====================
+
 // 3. 일반 매칭권 차감 로직
 exports.useMatchCount = async (email) => {
   const user = await this.getUserByEmail(email);
   if (user.matchCount <= 0) throw new Error("NO_MATCH_COUNT");
 
-  user.matchCount -= 1;
+  // user.matchCount -= 1;
+  await user.decrement("matchCount", { by: 1 });
   // 차감 후의 최신 상태를 반환
+  await user.reload(); // DB에서 최신 데이터 다시 로드
   return this.getUserStatus(email);
 };
 
@@ -81,7 +38,99 @@ exports.useAiMatchCount = async (email) => {
   const user = await this.getUserByEmail(email);
   if (user.aiMatchCount <= 0) throw new Error("NO_AI_MATCH_COUNT");
 
-  user.aiMatchCount -= 1;
+  // user.aiMatchCount -= 1;
+  await user.decrement("aiMatchCount", { by: 1 });
   // 차감 후의 최신 상태를 반환
+  await user.reload();
   return this.getUserStatus(email);
+};
+
+// ==================== 매칭권 증가 로직 ====================
+
+// 5. 일반 매칭권 추가
+exports.addMatchCount = async (email, amount = 1) => {
+  const user = await this.getUserByEmail(email);
+  await user.increment('matchCount', { by: amount });
+  await user.reload();
+  return this.getUserStatus(email);
+};
+
+// 6. AI 매칭권 추가
+exports.addAiMatchCount = async (email, amount = 1) => {
+  const user = await this.getUserByEmail(email);
+  await user.increment('aiMatchCount', { by: amount });
+  await user.reload();
+  return this.getUserStatus(email);
+};
+
+// ==================== 유저 정보 업데이트 ====================
+
+// 7. 유저 프로필 업데이트
+exports.updateUserProfile = async (email, updateData) => {
+  const user = await this.getUserByEmail(email);
+
+  // 업데이트 가능한 필드만 추출
+  const allowedFields = ['nickname', 'gender', 'age'];
+  const filteredData = {};
+
+  allowedFields.forEach(field => {
+    if (updateData[field] !== undefined) {
+      filteredData[field] = updateData[field];
+    }
+  });
+
+  await user.update(filteredData);
+  return user;
+};
+
+// 8. 프로 구독 설정
+exports.setProStatus = async (email, isPro, expiredAt = null) => {
+  const user = await this.getUserByEmail(email);
+  await user.update({
+    isPro,
+    proExpiredAt: expiredAt
+  });
+  await user.reload();
+  return this.getUserStatus(email);
+};
+
+// 9. 크레딧 추가/차감
+exports.updateCredit = async (email, amount) => {
+  const user = await this.getUserByEmail(email);
+
+  if (amount > 0) {
+    await user.increment('credit', { by: amount });
+  } else {
+    const newCredit = user.credit + amount; // amount는 음수
+    if (newCredit < 0) {
+      throw new Error("INSUFFICIENT_CREDIT");
+    }
+    await user.decrement('credit', { by: Math.abs(amount) });
+  }
+
+  await user.reload();
+  return this.getUserStatus(email);
+};
+
+// ==================== 유틸리티 함수 ====================
+
+// 10. 모든 유저 조회 (관리자용)
+exports.getAllUsers = async () => {
+  return await User.findAll({
+    attributes: { exclude: ['password'] }, // 비밀번호 제외
+    order: [['createdAt', 'DESC']]
+  });
+};
+
+// 11. 유저 존재 여부 확인
+exports.checkUserExists = async (email) => {
+  const user = await User.findOne({ where: { email } });
+  return !!user; // boolean 반환
+};
+
+// 12. 유저 삭제 (회원 탈퇴)
+exports.deleteUser = async (email) => {
+  const user = await this.getUserByEmail(email);
+  await user.destroy();
+  return { success: true, message: "User deleted" };
 };
