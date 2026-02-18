@@ -4,6 +4,7 @@ const AiProfile = require('./AiProfile');
 const ChatRoom = require('./ChatRoom');
 const Message = require('./Message');
 const ChatAnalysis = require('./ChatAnalysis');
+const Match = require('./Match');
 
 // ========== 관계 설정 ==========
 
@@ -35,6 +36,16 @@ ChatAnalysis.belongsTo(ChatRoom, { foreignKey: 'chatRoomId', as: 'chatRoom' });
 User.hasMany(ChatAnalysis, { foreignKey: 'userId', as: 'analyses' });
 ChatAnalysis.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// Match ↔ User
+User.hasMany(Match, { foreignKey: 'user1_id', sourceKey: 'id', as: 'matchesAsUser1' });
+Match.belongsTo(User, {foreignKey: 'user1_id', targetKey: 'id', as: 'user1', onDelete: 'CASCADE'});
+
+User.hasMany(Match, { foreignKey: 'user2_id', sourceKey: 'id', as: 'matchesAsUser2' });
+Match.belongsTo(User, {foreignKey: 'user2_id', targetKey: 'id', as: 'user2', onDelete: 'CASCADE'});
+
+// Match ↔ ChatRoom
+Match.belongsTo(ChatRoom, {foreignKey: 'chatRoomId', as: 'chatRoom', onDelete: 'SET NULL'});
+
 // ========== 동기화 함수 ==========
 const syncDatabase = async (options = {}) => {
     try {
@@ -52,5 +63,6 @@ module.exports = {
     ChatRoom,
     Message,
     ChatAnalysis,
+    Match,
     syncDatabase,
 };
