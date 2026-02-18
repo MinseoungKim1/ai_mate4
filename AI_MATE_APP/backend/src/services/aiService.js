@@ -30,7 +30,7 @@ const getAiResponse = async (messages, promptType = "chat", context = null) => {
         }
 
         const response = await openai.chat.completions.create({
-            model: "gpt-4o", // Upgraded to gpt-4o for better analysis if needed, or keep gpt-4o-mini
+            model: "gpt-4o-mini", // Use gpt-4o-mini as the most cost-effective model
             messages: [
                 { role: "system", content: systemPrompt },
                 ...messages
