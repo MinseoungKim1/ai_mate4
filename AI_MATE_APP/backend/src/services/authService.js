@@ -111,7 +111,7 @@ exports.processKakaoLogin = async (code) => {
 
     if (user) {
       // 이미 가입된 유저: 로그인 성공 처리
-      await User.update({ lastLoginAt: new Date() })
+      await user.update({ lastLoginAt: new Date() });
 
       return {
         success: true,
