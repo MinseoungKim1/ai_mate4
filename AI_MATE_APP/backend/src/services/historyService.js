@@ -1,115 +1,265 @@
-// 1. 대화 리스트 (History 메인 목록용)
-const histories = [
-  {
-    id: "chat_001",
-    userEmail: "test@test.com",
-    partner: "지아",
-    date: "2026.02.14",
-    score: 88,
-    tags: ["지적인", "차분한", "예술적인"],
-    chatType: "ai",
-  },
-  {
-    id: "chat_002",
-    userEmail: "test@test.com",
-    partner: "미나",
-    date: "2026.02.10",
-    score: 72,
-    tags: ["활발한", "유머러스한"],
-    chatType: "user",
-  },
-];
+const { User, ChatRoom, Message, ChatAnalysis, AiProfile } = require('../models');
 
-// 2. 💡 상세 대화 메시지 (HistoryChatRoom 열람용)
-const chatMessages = [
-  // chat_001 (지아님과의 대화) 상세 데이터
-  {
-    id: 4,
-    chatId: "chat_001",
-    sender: "me",
-    text: "안녕하세요 지아님! 반갑습니다. 메이트한테 얘기 많이 들었어요.",
-  },
-  {
-    id: 5,
-    chatId: "chat_001",
-    sender: "other",
-    text: "아, 안녕하세요! 저도요. 주말 오후에 이렇게 뵙게 되니 반갑네요.",
-  },
-  {
-    id: 6,
-    chatId: "chat_001",
-    sender: "me",
-    text: "지적인 분위기가 매력적이시라고 들었는데, 정말 그런 것 같아요.",
-  },
-  {
-    id: 7,
-    chatId: "chat_001",
-    sender: "other",
-    text: "어머, 과찬이세요. 저는 그냥 조용히 책 읽거나 전시회 보는 걸 좋아할 뿐이에요.",
-  },
-  {
-    id: 8,
-    chatId: "chat_001",
-    sender: "me",
-    text: "오, 저도 전시회 좋아해요! 최근에 다녀오신 곳 중에 추천해주실 만한 곳이 있나요?",
-  },
-  {
-    id: 9,
-    chatId: "chat_001",
-    sender: "other",
-    text: "음, 최근에 시립미술관에서 하는 현대미술전을 봤는데 구성이 참 차분하더라고요.",
-  },
-  {
-    id: 10,
-    chatId: "chat_001",
-    sender: "me",
-    text: "아! 저도 거기 가보려고 했었는데. 혼자 가시는 편인가요?",
-  },
-  {
-    id: 11,
-    chatId: "chat_001",
-    sender: "other",
-    text: "네, 가끔은 혼자서 조용히 작품에 집중하는 시간이 힐링이 되더라고요. 혹시 실례가 안 된다면 어떤 스타일의 예술을 좋아하세요?",
-  },
-  {
-    id: 12,
-    chatId: "chat_001",
-    sender: "me",
-    text: "저는 너무 추상적인 것보다 따뜻한 색감의 인상주의 화풍을 좋아하는 편이에요.",
-  },
-  {
-    id: 13,
-    chatId: "chat_001",
-    sender: "other",
-    text: "정말요? 저랑 취향이 비슷하시네요! 인상주의 작품들은 보고 있으면 마음이 참 편안해지죠.",
-  },
-
-  // chat_002 (미나님과의 대화) 상세 데이터
-  { id: 6, chatId: "chat_002", sender: "me", text: "오늘 날씨가 참 좋네요!" },
-  {
-    id: 7,
-    chatId: "chat_002",
-    sender: "other",
-    text: "맞아요! 산책하기 딱 좋은 날씨예요.",
-  },
-];
-
-// 대화 목록 조회
+// ==================== 대화 목록 조회 ====================
 exports.getUserHistories = async (email) => {
-  return histories.filter((h) => h.userEmail === email);
-};
+  try {
+    // 1. 유저 찾기
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      throw new Error("USER_NOT_FOUND");
+    }
 
-// 💡 대화 상세 내역 조회 추가
-exports.getChatDetail = async (chatId) => {
-  return chatMessages.filter((msg) => msg.chatId === chatId);
-};
+    // 2. 해당 유저의 채팅방 목록 조회
+    const chatRooms = await ChatRoom.findAll({
+      where: { userId: user.id },
+      include: [
+        {
+          model: AiProfile,
+          as: 'aiProfile',
+          attributes: ['name', 'personalityTags']
+        },
+        {
+          model: ChatAnalysis,
+          as: 'analysis',
+          required: false // 분석 안 된 방도 포함
+        }
+      ],
+      order: [['createdAt', 'DESC']], // 최근순
+      limit: 50 // 최근 50개만 (성능 최적화)
+    });
 
-// 기록 삭제
-exports.deleteHistory = async (id) => {
-  const index = histories.findIndex((h) => h.id === id);
-  if (index !== -1) {
-    histories.splice(index, 1);
-    return true;
+    // 3. 기존 프론트엔드 형식에 맞게 변환
+    return chatRooms.map(room => ({
+      id: room.id, // "chat_001"
+      userEmail: email,
+      partner: room.partnerName,
+      date: new Date(room.createdAt).toISOString().split('T')[0].replace(/-/g, '.'), // "2026.02.14"
+      score: room.analysisScore || 0,
+      tags: room.analysis?.personalityTags || room.aiProfile?.personalityTags || [],
+      chatType: room.chatType, // "ai" or "user"
+      status: room.status || 'active',
+      messageCount: room.messageCount || 0,
+      appointmentMade: room.appointmentMade || false,
+      createdAt: room.createdAt,
+    }));
+
+  } catch (error) {
+    console.error("getUserHistories Error:", error);
+    throw error;
   }
-  return false;
+};
+
+// ==================== 대화 상세 내역 조회 ====================
+exports.getChatDetail = async (chatId) => {
+  try {
+    // 1. 채팅방 존재 확인
+    const chatRoom = await ChatRoom.findByPk(chatId);
+    if (!chatRoom) {
+      throw new Error("CHAT_NOT_FOUND");
+    }
+
+    // 2. 해당 채팅방 메시지 목록 조회
+    const messages = await Message.findAll({
+      where: { chatRoomId: chatId },
+      order: [['createdAt', 'ASC']], // 시간순
+      include: [
+        {
+          model: User,
+          as: 'sender',
+          attributes: ['nickname']
+        }
+      ]
+    });
+
+    // 3. 기존 프론트엔드 형식에 맞게 변환
+    return messages.map(msg => ({
+      id: msg.id,
+      chatId: msg.chatRoomId,
+      sender: msg.senderType === 'user' ? 'me' : 'other',
+      text: msg.messageText,
+      aiCoaching: msg.aiCoaching || null,
+      timestamp: msg.createdAt,
+    }));
+
+  } catch (error) {
+    console.error("getChatDetail Error:", error);
+    throw error;
+  }
+};
+
+// ==================== 기록 삭제 ====================
+exports.deleteHistory = async (chatId) => {
+  try {
+    // 1. 채팅방 존재 확인
+    const chatRoom = await ChatRoom.findByPk(chatId);
+    if (!chatRoom) {
+      throw new Error("CHAT_NOT_FOUND");
+    }
+
+    // 2. 채팅방과 관련 데이터 삭제
+    // ✅ 외래키 CASCADE 설정으로 Message, ChatAnalysis도 자동 삭제됨
+    await chatRoom.destroy();
+
+    return true;
+
+  } catch (error) {
+    console.error("deleteHistory Error:", error);
+    throw error;
+  }
+};
+
+// ==================== 추가 기능 ====================
+
+// 채팅방 분석 결과 조회
+exports.getChatAnalysis = async (chatId) => {
+  try {
+    const chatRoom = await ChatRoom.findByPk(chatId);
+    if (!chatRoom) {
+      throw new Error("CHAT_NOT_FOUND");
+    }
+
+    const analysis = await ChatAnalysis.findOne({
+      where: { chatRoomId: chatId },
+      include: [
+        {
+          model: ChatRoom,
+          as: 'chatRoom',
+          attributes: ['partnerName', 'chatType']
+        }
+      ]
+    });
+
+    return {
+      chatRoom: chatRoom.toJSON(),
+      analysis: analysis ? analysis.toJSON() : null,
+      isAnalyzed: !!analysis,
+    };
+
+  } catch (error) {
+    console.error("getChatAnalysis Error:", error);
+    throw error;
+  }
+};
+
+// 분석 결과 저장
+exports.saveChatAnalysis = async (chatId, analysisData) => {
+  try {
+    const chatRoom = await ChatRoom.findByPk(chatId);
+    if (!chatRoom) {
+      throw new Error("CHAT_NOT_FOUND");
+    }
+
+    // 분석 결과 저장
+    const analysis = await ChatAnalysis.create({
+      chatRoomId: chatId,
+      userId: chatRoom.userId,
+      totalScore: analysisData.totalScore,
+      humorScore: analysisData.humorScore,
+      mannerScore: analysisData.mannerScore,
+      empathyScore: analysisData.empathyScore,
+      activenessScore: analysisData.activenessScore,
+      conversationRhythmScore: analysisData.conversationRhythmScore,
+      personalityTags: analysisData.personalityTags,
+      strengths: analysisData.strengths,
+      improvements: analysisData.improvements,
+      detailedFeedback: analysisData.detailedFeedback,
+    });
+
+    // 채팅방 상태 업데이트
+    await chatRoom.update({
+      status: 'completed',
+      isAnalyzed: true,
+      analysisScore: analysis.totalScore,
+    });
+
+    return analysis;
+
+  } catch (error) {
+    console.error("saveChatAnalysis Error:", error);
+    throw error;
+  }
+};
+
+// 일정 잡기 완료 처리
+exports.completeAppointment = async (chatId, appointmentDate) => {
+  try {
+    const chatRoom = await ChatRoom.findByPk(chatId);
+    if (!chatRoom) {
+      throw new Error("CHAT_NOT_FOUND");
+    }
+
+    await chatRoom.update({
+      appointmentMade: true,
+      appointmentDate: new Date(appointmentDate),
+      status: 'completed',
+    });
+
+    return chatRoom;
+
+  } catch (error) {
+    console.error("completeAppointment Error:", error);
+    throw error;
+  }
+};
+
+// 채팅방 생성 (AI 매칭 시작)
+exports.createChatRoom = async (email, aiProfileId) => {
+  try {
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      throw new Error("USER_NOT_FOUND");
+    }
+
+    const aiProfile = await AiProfile.findByPk(aiProfileId);
+    if (!aiProfile) {
+      throw new Error("AI_PROFILE_NOT_FOUND");
+    }
+
+    // AI 매칭권 차감
+    await userService.useAiMatchCount(email);
+
+    // 새 채팅방 생성
+    return await ChatRoom.create({
+      id: `chat_${Date.now()}`,
+      userId: user.id,
+      chatType: 'ai',
+      aiProfileId: aiProfile.id,
+      partnerName: aiProfile.name,
+      status: 'active',
+      messageCount: 0,
+    });
+
+  } catch (error) {
+    console.error("createChatRoom Error:", error);
+    throw error;
+  }
+};
+
+// 실시간 메시지 저장 (Socket.io용)
+exports.saveMessage = async (chatRoomId, senderType, senderId, messageText, aiCoaching = null) => {
+  try {
+    const chatRoom = await ChatRoom.findByPk(chatRoomId);
+    if (!chatRoom) {
+      throw new Error("CHAT_ROOM_NOT_FOUND");
+    }
+
+    // 메시지 저장
+    const message = await Message.create({
+      chatRoomId,
+      senderType,
+      senderId: senderType === 'user' ? senderId : null,
+      messageText,
+      aiCoaching,
+    });
+
+    // 채팅방 메시지 카운트 증가
+    await chatRoom.increment('messageCount');
+    await chatRoom.update({ lastMessageAt: new Date() });
+
+    return message;
+
+  } catch (error) {
+    console.error("saveMessage Error:", error);
+    throw error;
+  }
 };
