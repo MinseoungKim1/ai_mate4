@@ -44,7 +44,7 @@ exports.login = async (req, res) => {
       return res.status(401).json({ success: false, message: "인증 실패 (이메일 또는 비밀번호 불일치)" });
     }
 
-    await user.update({ lastLogin: new Date() });
+    await user.update({ lastLoginAt: new Date() });
 
     return res.status(200).json({
       success: true,
