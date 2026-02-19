@@ -381,14 +381,14 @@ const Login = () => {
                 <img src={kakaoLogo} alt="Kakao" style={socialIconImageStyle} />
                 카카오로 시작하기
               </button>
-              <button type="button" style={googleButtonStyle}>
+              {/* <button type="button" style={googleButtonStyle}>
                 <img
                   src={googleLogo}
                   alt="Google"
                   style={socialIconImageStyle}
                 />
                 Google로 시작하기
-              </button>
+              </button> */}
             </div>
 
             <p
