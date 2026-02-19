@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -14,44 +14,58 @@ import { API_URL } from "../config";
 
 const Analyze = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [remainingAiCount, setRemainingAiCount] = useState(null);
-
-  const analysisData = {
-    totalScore: 85,
-    grade: "A-",
-    style: "다정다감한 공감형",
-    desc: "상대방의 감정을 잘 캐치하고 부드럽게 대화를 이끄는 능력이 탁월하시네요!",
-    stats: [
-      { label: "센스", value: 90, icon: <Zap size={16} /> },
-      { label: "호감도", value: 82, icon: <Heart size={16} /> },
-      { label: "대화량", value: 75, icon: <MessageCircle size={16} /> },
-      { label: "공감능력", value: 95, icon: <Star size={16} /> },
-    ],
-  };
-
   const [analysis, setAnalysis] = useState(null);
+  const fetchedRef = React.useRef(false);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
+      if (fetchedRef.current) return;
+      
       try {
-        const locationState = window.history.state?.usr; // roomId passed from navigate
-        const roomId = locationState?.roomId;
+        const roomId = location.state?.roomId;
 
         if (!roomId) {
-          console.warn("Room ID not found, using test analysis.");
+          console.warn("Room ID not found in location state.");
           setLoading(false);
           return;
         }
+
+        fetchedRef.current = true;
 
         const response = await fetch(`${API_URL}/api/history/analyze`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ roomId }),
-        }).then((res) => res.json());
+        }).then(async (res) => {
+          if (!res.ok) {
+            const text = await res.text();
+            if (text.startsWith("<!DOCTYPE")) {
+              throw new Error("서버 소스가 최신이 아닙니다. 백엔드를 재시작해 주세요.");
+            }
+            throw new Error(`분석 요청 실패 (${res.status})`);
+          }
+          return res.json();
+        });
 
         if (response.success && response.data) {
-          setAnalysis(response.data);
+          // 백엔드 데이터(ChatAnalysis 모델)를 프론트엔드 UI 형식으로 변환
+          const raw = response.data;
+          const formattedData = {
+              totalScore: raw.totalScore,
+              style: raw.personalityTags?.[0] || "분석 완료",
+              desc: raw.strengths || "대화 내용이 충분하지 않아 분석이 어렵습니다.",
+              advice: raw.improvements || "비슷한 관심사를 공유해보세요.",
+              stats: [
+                  { label: "센스", value: raw.humorScore || 50, icon: <Zap size={16} /> },
+                  { label: "호감도", value: raw.mannerScore || 50, icon: <Heart size={16} /> },
+                  { label: "대화량", value: raw.activenessScore || 50, icon: <MessageCircle size={16} /> },
+                  { label: "공감능력", value: raw.empathyScore || 50, icon: <Star size={16} /> },
+              ],
+          };
+          setAnalysis(formattedData);
 
           // Then fetch status for remaining count
           const userEmail = localStorage.getItem("userEmail");
@@ -66,21 +80,18 @@ const Analyze = () => {
           }
           setLoading(false);
         } else {
-          alert(response.message || "분석 실패");
+          window.alert(response.message || "분석결과를 불러오지 못했습니다.");
           navigate("/home");
         }
       } catch (error) {
         console.error("분석 로드 중 오류 발생:", error);
+        window.alert(error.message || "분석 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
         navigate("/home");
       }
     };
 
     fetchAnalysis();
-  }, [navigate]);
-
-  // Use real analysis data or fallback
-  const displayData = analysis || analysisData;
-  const adviceText = analysis?.advice || "분석 결과가 없습니다.";
+  }, [navigate, location.state]);
 
   if (loading) {
     return (
@@ -104,6 +115,15 @@ const Analyze = () => {
     );
   }
 
+  // Use real analysis data or fallback to prevent crash
+  const displayData = analysis || {
+    totalScore: 0,
+    style: "분석 실패",
+    desc: "데이터를 불러오지 못했습니다.",
+    stats: [],
+  };
+  const adviceText = analysis?.advice || "분석 결과가 없습니다.";
+
   return (
     <div style={outerWrapperStyle}>
       <div style={containerStyle}>
@@ -114,7 +134,7 @@ const Analyze = () => {
           <h3 style={headerTitleStyle}>AI 분석 리포트</h3>
           <button
             style={shareBtnStyle}
-            onClick={() => alert("리포트를 공유합니다!")}
+            onClick={() => alert("리포트를 공유합시다!")}
           >
             <Share2 size={20} color="#333" />
           </button>
@@ -128,7 +148,7 @@ const Analyze = () => {
             style={scoreCardStyle}
           >
             <div style={badgeStyle}>
-              분석 완료 (남은 AI권: {remainingAiCount}회)
+              분석 완료 (남은 AI권: {remainingAiCount ?? 0}회)
             </div>
             <div style={scoreCircleStyle}>
               <span style={scoreTextStyle}>{displayData.totalScore}</span>

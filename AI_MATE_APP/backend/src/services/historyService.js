@@ -152,30 +152,64 @@ exports.saveChatAnalysis = async (chatId, analysisData) => {
       throw new Error("CHAT_NOT_FOUND");
     }
 
-    // 분석 결과 저장
-    const analysis = await ChatAnalysis.create({
-      chatRoomId: chatId,
-      userId: chatRoom.userId,
-      totalScore: analysisData.totalScore,
-      humorScore: analysisData.humorScore,
-      mannerScore: analysisData.mannerScore,
-      empathyScore: analysisData.empathyScore,
-      activenessScore: analysisData.activenessScore,
-      conversationRhythmScore: analysisData.conversationRhythmScore,
-      personalityTags: analysisData.personalityTags,
-      strengths: analysisData.strengths,
-      improvements: analysisData.improvements,
-      detailedFeedback: analysisData.detailedFeedback,
-    });
+    // 분석 결과 저장 (중복 발생 시 업데이트)
+    try {
+      let analysis = await ChatAnalysis.findOne({ where: { chatRoomId: chatId } });
 
-    // 채팅방 상태 업데이트
-    await chatRoom.update({
-      status: 'completed',
-      isAnalyzed: true,
-      analysisScore: analysis.totalScore,
-    });
+      if (analysis) {
+        await analysis.update({
+          totalScore: analysisData.totalScore,
+          humorScore: analysisData.humorScore,
+          mannerScore: analysisData.mannerScore,
+          empathyScore: analysisData.empathyScore,
+          activenessScore: analysisData.activenessScore,
+          conversationRhythmScore: analysisData.conversationRhythmScore,
+          personalityTags: analysisData.personalityTags,
+          strengths: analysisData.strengths,
+          improvements: analysisData.improvements,
+          detailedFeedback: analysisData.detailedFeedback,
+          analyzedAt: new Date(),
+        });
+      } else {
+        analysis = await ChatAnalysis.create({
+          chatRoomId: chatId,
+          userId: chatRoom.userId,
+          totalScore: analysisData.totalScore,
+          humorScore: analysisData.humorScore,
+          mannerScore: analysisData.mannerScore,
+          empathyScore: analysisData.empathyScore,
+          activenessScore: analysisData.activenessScore,
+          conversationRhythmScore: analysisData.conversationRhythmScore,
+          personalityTags: analysisData.personalityTags,
+          strengths: analysisData.strengths,
+          improvements: analysisData.improvements,
+          detailedFeedback: analysisData.detailedFeedback,
+        });
+      }
 
-    return analysis;
+      // 채팅방 상태 업데이트
+      await chatRoom.update({
+        status: 'completed',
+        isAnalyzed: true,
+        analysisScore: analysis.totalScore,
+      });
+
+      return analysis;
+    } catch (saveError) {
+      // 만약 동시 요청으로 인해 create에서 중복 에러가 발생한 경우 다시 시도
+      if (saveError.name === 'SequelizeUniqueConstraintError' || saveError.code === 'ER_DUP_ENTRY') {
+          console.log("[saveChatAnalysis] Duplicate detected, retrying update...");
+          const existing = await ChatAnalysis.findOne({ where: { chatRoomId: chatId } });
+          if (existing) {
+              return await existing.update({
+                  totalScore: analysisData.totalScore,
+                  detailedFeedback: analysisData.detailedFeedback,
+                  analyzedAt: new Date()
+              });
+          }
+      }
+      throw saveError;
+    }
 
   } catch (error) {
     console.error("saveChatAnalysis Error:", error);

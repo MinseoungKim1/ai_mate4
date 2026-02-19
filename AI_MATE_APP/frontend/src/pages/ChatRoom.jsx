@@ -472,7 +472,7 @@ const analyzeButtonStyle = (isPro, isConnected) => ({
   display: "flex",
   alignItems: "center",
   padding: "8px 14px",
-  backgroundColor: "#8a4fff",
+  backgroundColor: "#6b21ff",
   color: "white",
   border: "none",
   borderRadius: "14px",
@@ -516,7 +516,7 @@ const bubbleStyle = (sender) => ({
   maxWidth: "75%",
   padding: "12px 16px",
   borderRadius: sender === "me" ? "20px 20px 4px 20px" : "10px",
-  backgroundColor: sender === "me" ? "#8a4fff" : "#fff",
+  backgroundColor: sender === "me" ? "#6b21ff" : "#fff",
   color: sender === "me" ? "#fff" : "#333",
   fontSize: "0.95rem",
   boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
@@ -555,6 +555,7 @@ const inputFieldStyle = {
   outline: "none",
   fontSize: "0.95rem",
   padding: "10px 0",
+  color: "#333", // ✅ 입력 글자색 수정
 };
 const sendButtonStyle = (text, connected) => ({
   width: "40px",
@@ -563,7 +564,7 @@ const sendButtonStyle = (text, connected) => ({
   border: "none",
   background:
     text.trim() && connected
-      ? "linear-gradient(135deg, #8a4fff 0%, #6b21ff 100%)"
+      ? "linear-gradient(135deg, #6b21ff 0%, #4b11cf 100%)"
       : "#f0f0f0",
   cursor: text.trim() && connected ? "pointer" : "default",
   display: "flex",

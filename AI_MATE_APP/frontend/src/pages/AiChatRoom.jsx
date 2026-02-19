@@ -152,6 +152,34 @@ const AiChatRoom = () => {
     try {
       setIsSubmitting(true);
       const userEmail = localStorage.getItem("userEmail");
+
+      // 1. 먼저 현재 대화 내용을 DB에 저장하고 roomId를 받아옴
+      const saveResponse = await fetch(`${API_URL}/api/history/ai/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail,
+          messages: messages,
+          partnerName: "AI 지아"
+        }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text();
+          if (text.startsWith("<!DOCTYPE")) {
+            throw new Error("서버가 최신 소스를 반영하지 못했습니다. 백엔드 서버를 재시작해 주세요.");
+          }
+          throw new Error(`저장 실패 (${res.status})`);
+        }
+        return res.json();
+      });
+
+      if (!saveResponse.success) {
+        throw new Error(saveResponse.message || "대화 저장 실패");
+      }
+
+      const roomId = saveResponse.roomId;
+
+      // 2. AI 매칭권 차감
       const response = await fetch(
         `${API_URL}/api/user/match/ai/use`,
         {
@@ -159,17 +187,25 @@ const AiChatRoom = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),
         },
-      ).then((res) => res.json());
+      ).then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text();
+          if (text.startsWith("<!DOCTYPE")) {
+            throw new Error("서버 응답 오류입니다. 백엔드 서버를 재시작해 주세요.");
+          }
+          throw new Error(`사용권 차감 실패 (${res.status})`);
+        }
+        return res.json();
+      });
 
       if (response.success) {
-        navigate("/analyze");
+        navigate("/analyze", { state: { roomId } });
       } else {
-        // 백엔드에서 체크하겠지만 프론트에서도 한 번 더 방어
         alert("이용 권한이 없습니다.");
       }
     } catch (error) {
-      console.error("AI 차감 중 오류:", error);
-      alert("통신 오류가 발생했습니다.");
+      console.error("AI 분석 준비 중 오류:", error);
+      alert(error.message || "통신 오류가 발생했습니다.");
     } finally {
       setIsSubmitting(false);
     }
@@ -377,7 +413,7 @@ const bubbleStyle = (sender) => ({
     sender === "system"
       ? "rgba(0,0,0,0.05)"
       : sender === "me"
-        ? "#8a4fff"
+        ? "#6b21ff"
         : sender === "mate"
           ? "#fff0f0"
           : "#fff",
@@ -424,13 +460,14 @@ const inputFieldStyle = {
   outline: "none",
   fontSize: "0.9rem",
   padding: "8px 0",
+  color: "#333", // ✅ 입력하는 글자색이 잘 보이도록 수정
 };
 const sendButtonStyle = (text) => ({
   width: "36px",
   height: "36px",
   borderRadius: "50%",
   border: "none",
-  background: text.trim() ? "#8a4fff" : "#f0f0f0",
+  background: text.trim() ? "#6b21ff" : "#f0f0f0",
   cursor: text.trim() ? "pointer" : "default",
   display: "flex",
   justifyContent: "center",
