@@ -142,3 +142,126 @@ exports.deleteUser = async (email) => {
   await user.destroy();
   return { success: true, message: "User deleted" };
 };
+
+// 1. 상품 플랜 정책 (PLAN_POLICIES의 필드명을 아래 로직과 일치시켰습니다)
+const PLAN_POLICIES = {
+  1: {
+    type: "TICKET",
+    matchCount: 1,      // 추가될 일반 매칭권
+    aiMatchCount: 1,    // 추가될 AI 매칭권
+    description: "1회 통합 매칭권"
+  },
+  2: {
+    type: "PRO",
+    matchCount: 3,      // 추가될 일반 매칭권
+    aiMatchCount: 3,    // 추가될 AI 매칭권
+    description: "프리미엄 구독 1개월"
+  },
+  3: {
+    type: "PRO",
+    matchCount: 3,      // 추가될 일반 매칭권
+    aiMatchCount: 3,    // 추가될 AI 매칭권
+    description: "테스트 1원 결제"
+  },
+};
+
+// 2. 결제 후 처리 로직
+exports.processPayment = async ({ email, planId, nickname }) => {
+  // [LOG] 1. 서비스 진입 및 입력 파라미터 확인
+  console.log(`\n[Service] >>> processPayment 시작: email=${email}, planId=${planId}, nickname=${nickname}`);
+
+  // 1. 유저 확인
+  const user = await this.getUserByEmail(email);
+  if (!user) {
+    console.error(`[Service] !!! 에러: 유저를 찾을 수 없음 (${email})`);
+    throw new Error("USER_NOT_FOUND");
+  }
+  console.log(`[Service] 1. 유저 조회 성공: DB 닉네임=${user.nickname}`);
+
+  // 닉네임 불일치 체크 (경고만 노출)
+  if (user.nickname !== nickname) {
+    console.warn(`[Service] [Warning] 닉네임 불일치: 요청(${nickname}) vs DB(${user.nickname})`);
+  }
+
+  // 2. 플랜 정책 가져오기
+  const plan = PLAN_POLICIES[planId];
+  if (!plan) {
+    console.error(`[Service] !!! 에러: 유효하지 않은 플랜 ID (${planId})`);
+    throw new Error("INVALID_PLAN");
+  }
+  console.log(`[Service] 2. 플랜 정책 확인: 타입=${plan.type}, 설명=${plan.description}`);
+
+  // 3. 플랜 타입에 따라 처리
+  if (plan.type === "TICKET") {
+    console.log(`[Service] 3-1. TICKET 처리 시작: matchCount+=${plan.matchCount}, aiMatchCount+=${plan.aiMatchCount}`);
+
+    await this.addMatchCount(email, plan.matchCount);
+    await this.addAiMatchCount(email, plan.aiMatchCount);
+
+  } else if (plan.type === "PRO") {
+    // [PRO 구독 처리]
+    const expiredAt = new Date();
+    expiredAt.setMonth(expiredAt.getMonth() + (plan.months || 1));
+
+    // [LOG] 업데이트 직전 값 확인
+    console.log(`[Service] 3-2. PRO 처리 시작: is_pro=true, match_count=3, ai_match_count=3, 만료일=${expiredAt.toISOString()}`);
+
+    // 유저 테이블 업데이트
+    await user.update({
+      is_pro: true,
+      pro_expired_at: expiredAt,
+      match_count: 3,            // 요구사항: 3으로 고정
+      ai_match_count: 3          // 요구사항: 3으로 고정
+    });
+
+    console.log(`[Service] [Success] ${email} DB 업데이트 완료 (is_pro: true)`);
+  }
+
+  // 4. 최종 업데이트된 유저 상태 반환
+  console.log(`[Service] 4. 데이터 리로드 및 최종 상태 조회 중...`);
+  await user.reload();
+  const status = await this.getUserStatus(email);
+
+  console.log(`[Service] <<< processPayment 종료 (최종 상태 반환 완료)\n`);
+  return status;
+};
+// exports.processPayment = async ({ email, planId, nickname }) => {
+//   // 1. 유저 확인
+//   const user = await this.getUserByEmail(email);
+//   if (!user) throw new Error("USER_NOT_FOUND");
+//
+//   if (user.nickname !== nickname) {
+//     console.warn(`[Warning] 결제 요청 닉네임 불일치: 요청(${nickname}) / DB(${user.nickname})`);
+//   }
+//
+//   // 2. 플랜 정책 가져오기
+//   const plan = PLAN_POLICIES[planId];
+//   if (!plan) throw new Error("INVALID_PLAN");
+//
+//   // 3. 플랜 타입에 따라 처리
+//   if (plan.type === "TICKET") {
+//     // [단건 매칭권] 기존 개수에 더하기 (기존 로직 유지)
+//     await this.addMatchCount(email, plan.matchCount);
+//     await this.addAiMatchCount(email, plan.aiMatchCount);
+//
+//   } else if (plan.type === "PRO") {
+//     // [PRO 구독 처리]
+//     const expiredAt = new Date();
+//     expiredAt.setMonth(expiredAt.getMonth() + (plan.months || 1));
+//
+//     // 유저 테이블 업데이트: is_pro, match_count, ai_match_count 명시적 변경
+//     // Sequelize 모델 기준 (카멜케이스/스네이크케이스 여부는 모델 정의에 따름)
+//     await user.update({
+//       is_pro: true,              // PRO 상태 활성화
+//       pro_expired_at: expiredAt, // 만료일 설정
+//       match_count: plan.matchCount,    // 3으로 변경
+//       ai_match_count: plan.aiMatchCount // 3으로 변경
+//     });
+//
+//     console.log(`[Success] ${email} 유저 PRO 업그레이드 완료`);
+//   }
+//
+//   // 4. 최종 업데이트된 유저 상태 반환
+//   await user.reload();
+//   return this.getUserStatus(email);
+// };

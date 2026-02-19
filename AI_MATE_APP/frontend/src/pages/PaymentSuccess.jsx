@@ -5,18 +5,55 @@ import { CheckCircle2, PartyPopper } from "lucide-react";
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [timeLeft, setTimeLeft] = useState(5); // 5초 카운트다운
+  const [timeLeft, setTimeLeft] = useState(5);
+  const [isUpdating, setIsUpdating] = useState(true);
 
-  // URL에서 결제 정보 가져오기 (필요시 DB 저장용)
-  const orderName = searchParams.get("orderName") || "멤버십 상품";
+  const orderName = searchParams.get("orderName") || "상품";
+  const planId = searchParams.get("planId");
 
+  // 1. 데이터 업데이트 전용 useEffect
   useEffect(() => {
-    // 5초 후 자동으로 홈으로 이동하는 타이머
+    const updateUserData = async () => {
+      const nickname = localStorage.getItem("nickname");
+      const userEmail = localStorage.getItem("userEmail");
+      console.log('nickname',nickname);
+      console.log('planId',planId);
+      console.log('userEmail',userEmail);
+      
+      if (!planId) return;
+
+      try {
+        const response = await fetch("/api/user/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planId: planId,
+            nickname: nickname,
+            userEmail: userEmail,
+          }),
+        });
+        console.log('response',response);
+
+        if (!response.ok) throw new Error("결제 정보 업데이트 실패");
+        
+        setIsUpdating(false);
+      } catch (error) {
+        console.error("DB 업데이트 실패:", error);
+        alert("결제 처리에 실패했습니다. 고객센터에 문의하세요.");
+      }
+    };
+
+    updateUserData();
+  }, [planId]); // planId가 있을 때 한 번만 실행
+
+  // 2. 타이머 및 페이지 이동 전용 useEffect
+  useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigate("/home");
+          navigate("/home", { replace: true }); // replace로 뒤로가기 방지
+          return 0;
         }
         return prev - 1;
       });
@@ -26,7 +63,7 @@ const PaymentSuccess = () => {
   }, [navigate]);
 
   const handleClose = () => {
-    navigate("/home");
+    navigate("/home", { replace: true });
   };
 
   return (
@@ -43,14 +80,20 @@ const PaymentSuccess = () => {
         </p>
 
         <div style={infoBoxStyle}>
-          <div style={infoItemStyle}>
-            <CheckCircle2 size={16} color="#4bb543" />
-            <span>아이템 즉시 지급 완료</span>
-          </div>
-          <div style={infoItemStyle}>
-            <CheckCircle2 size={16} color="#4bb543" />
-            <span>프리미엄 권한 활성화</span>
-          </div>
+          {isUpdating ? (
+            <p style={{ fontSize: "0.9rem", color: "#888" }}>정보를 업데이트 중입니다...</p>
+          ) : (
+            <>
+              <div style={infoItemStyle}>
+                <CheckCircle2 size={16} color="#4bb543" />
+                <span>아이템 즉시 지급 완료</span>
+              </div>
+              <div style={infoItemStyle}>
+                <CheckCircle2 size={16} color="#4bb543" />
+                <span>프리미엄 권한 활성화</span>
+              </div>
+            </>
+          )}
         </div>
 
         <button onClick={handleClose} style={confirmButtonStyle}>
@@ -61,6 +104,7 @@ const PaymentSuccess = () => {
   );
 };
 
+// ... 스타일 정의는 동일하게 유지 ...
 // --- 스타일 정의 ---
 const overlayStyle = {
   width: "100vw",
