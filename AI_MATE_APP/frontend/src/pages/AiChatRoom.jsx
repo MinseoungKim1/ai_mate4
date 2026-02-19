@@ -88,7 +88,7 @@ const AiChatRoom = () => {
       {
         id: 5,
         sender: "other",
-        text: "기다리고 있었어요! 오늘 하루는 어떠셨나요? 😊",
+        text: "안녕하세요! 25살 지아라고 합니다. 만나서 반가워요! 😊",
       },
     ];
 
@@ -123,10 +123,12 @@ const AiChatRoom = () => {
     setIsAiTyping(true);
 
     // AI에게 대화 기록 전달 (시스템 메시지 제외)
-    const chatHistory = newMessages.filter(m => m.sender === "me" || m.sender === "other");
+    const chatHistory = newMessages.filter(
+      (m) => m.sender === "me" || m.sender === "other",
+    );
     socket.emit("send-ai-message", {
       messages: chatHistory,
-      context: { tags, age } // 💡 이상형 정보를 함께 전달
+      context: { tags, age }, // 💡 이상형 정보를 함께 전달
     });
   };
 
@@ -160,13 +162,15 @@ const AiChatRoom = () => {
         body: JSON.stringify({
           email: userEmail,
           messages: messages,
-          partnerName: "AI 지아"
+          partnerName: "AI 지아",
         }),
       }).then(async (res) => {
         if (!res.ok) {
           const text = await res.text();
           if (text.startsWith("<!DOCTYPE")) {
-            throw new Error("서버가 최신 소스를 반영하지 못했습니다. 백엔드 서버를 재시작해 주세요.");
+            throw new Error(
+              "서버가 최신 소스를 반영하지 못했습니다. 백엔드 서버를 재시작해 주세요.",
+            );
           }
           throw new Error(`저장 실패 (${res.status})`);
         }
@@ -180,18 +184,17 @@ const AiChatRoom = () => {
       const roomId = saveResponse.roomId;
 
       // 2. AI 매칭권 차감
-      const response = await fetch(
-        `${API_URL}/api/user/match/ai/use`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail }),
-        },
-      ).then(async (res) => {
+      const response = await fetch(`${API_URL}/api/user/match/ai/use`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userEmail }),
+      }).then(async (res) => {
         if (!res.ok) {
           const text = await res.text();
           if (text.startsWith("<!DOCTYPE")) {
-            throw new Error("서버 응답 오류입니다. 백엔드 서버를 재시작해 주세요.");
+            throw new Error(
+              "서버 응답 오류입니다. 백엔드 서버를 재시작해 주세요.",
+            );
           }
           throw new Error(`사용권 차감 실패 (${res.status})`);
         }

@@ -147,11 +147,12 @@ const History = () => {
                     </div>
 
                     <div style={tagContainerStyle}>
-                      {item.tags.map((tag) => (
-                        <span key={tag} style={miniTagStyle}>
-                          #{tag}
-                        </span>
-                      ))}
+                      {Array.isArray(item.tags) &&
+                        item.tags.map((tag) => (
+                          <span key={tag} style={miniTagStyle}>
+                            #{tag}
+                          </span>
+                        ))}
                     </div>
                   </motion.div>
                 </div>
@@ -231,9 +232,9 @@ const cardWrapperStyle = {
 const behindDeleteActionStyle = {
   position: "absolute",
   right: "10px", // ✅ 우측 여백 추가
-  top: "12px",   // ✅ 상단 여백 추가
+  top: "12px", // ✅ 상단 여백 추가
   bottom: "12px", // ✅ 하단 여백 추가
-  width: "65px",  // ✅ 너비 약간 축소
+  width: "65px", // ✅ 너비 약간 축소
   backgroundColor: "#ff4d4d",
   borderRadius: "16px", // ✅ 크기에 맞춰 둥근 모서리 조정
   display: "flex",
