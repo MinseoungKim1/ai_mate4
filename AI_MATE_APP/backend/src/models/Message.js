@@ -18,7 +18,7 @@ const Message = sequelize.define('Message', {
         field: 'sender_type',
     },
     senderId: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.BIGINT,
         field: 'sender_id',
     },
     messageText: {
