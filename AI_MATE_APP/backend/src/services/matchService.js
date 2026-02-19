@@ -117,7 +117,7 @@ exports.tryMatch = async () => {
         };
     });
 
-    // ✅ 매칭 알고리즘: 가장 오래 기다린 유저(candidates[0])와 가장 점수가 비슷한 다른 성별의 유저 찾기
+    // ✅ 매칭 알고리즘: 가장 오래 기다린 유저(candidates[0])와 가장 점수가 비슷한 '다른 성별'의 유저 찾기
     const user1 = candidates[0];
     let bestMatchIndex = -1;
     let minScoreDiff = Infinity;
@@ -125,7 +125,7 @@ exports.tryMatch = async () => {
     for (let i = 1; i < candidates.length; i++) {
         const user2 = candidates[i];
         
-        // 성별이 다른 경우 우선 (비즈니스 로직에 따라 변경 가능)
+        // 🔒 성별이 다른 경우에만 매칭 (Strict Gender Matching)
         if (user1.user.gender !== user2.user.gender) {
             const diff = Math.abs(user1.score - user2.score);
             if (diff < minScoreDiff) {
@@ -135,34 +135,40 @@ exports.tryMatch = async () => {
         }
     }
 
-    // 만약 다른 성별이 없으면 그냥 가장 점수 비슷한 유저와 매칭
     if (bestMatchIndex === -1) {
-        for (let i = 1; i < candidates.length; i++) {
-            const user2 = candidates[i];
-            const diff = Math.abs(user1.score - user2.score);
-            if (diff < minScoreDiff) {
-                minScoreDiff = diff;
-                bestMatchIndex = i;
-            }
-        }
+        console.log(`[Queue] ${user1.user.email}님에게 적합한 이성 매칭 상대를 찾는 중...`);
+        return null;
     }
-
-    if (bestMatchIndex === -1) return null;
 
     const user2 = candidates[bestMatchIndex];
     const roomId = `room_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    
+    // 📊 적합도 산출 (100점 만점 기준)
+    const compatibilityScore = Math.max(0, 100 - minScoreDiff);
 
-    // ✅ 트랜잭션 없이 각각 업데이트 (간단하게)
+    // ✅ DB 업데이트 (roomId, 상대 ID, 상태, 적합도 점수)
     await Match.update(
-        { roomId, user2Id: user2.user.id, status: 'accepted', matchedAt: new Date() },
+        { 
+            roomId, 
+            user2Id: user2.user.id, 
+            status: 'accepted', 
+            matchedAt: new Date(),
+            compatibilityScore: compatibilityScore 
+        },
         { where: { id: user1.match.id } }
     );
     await Match.update(
-        { roomId, user2Id: user1.user.id, status: 'accepted', matchedAt: new Date() },
+        { 
+            roomId, 
+            user2Id: user1.user.id, 
+            status: 'accepted', 
+            matchedAt: new Date(),
+            compatibilityScore: compatibilityScore
+        },
         { where: { id: user2.match.id } }
     );
 
-    console.log(`[Match] 점수 기반 매칭 성공: ${user1.user.email}(${user1.score}) ↔ ${user2.user.email}(${user2.score})`);
+    console.log(`[Match] 전략적 매칭 성공: ${user1.user.email}(${user1.score}) ↔ ${user2.user.email}(${user2.score}) | 적합도: ${compatibilityScore}점`);
 
     // ✅ ntfy.sh 알림 전송
     const notifyMatch = async (me, partner, myScore) => {

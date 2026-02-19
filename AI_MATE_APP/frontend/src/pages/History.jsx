@@ -116,7 +116,7 @@ const History = () => {
 
                   <motion.div
                     drag="x"
-                    dragConstraints={{ left: -85, right: 0 }}
+                    dragConstraints={{ left: -75, right: 0 }}
                     dragElastic={0.1}
                     onDragStart={() => setIsDragging(true)}
                     onDragEnd={() => setTimeout(() => setIsDragging(false), 50)}
@@ -225,15 +225,17 @@ const cardWrapperStyle = {
   position: "relative",
   marginBottom: "16px",
   borderRadius: "24px",
-  backgroundColor: "#ff4d4d",
+  backgroundColor: "transparent", // ✅ 빨간 잔상을 없애기 위해 투명하게 변경
   overflow: "hidden",
 };
 const behindDeleteActionStyle = {
   position: "absolute",
-  right: 0,
-  top: 0,
-  bottom: 0,
-  width: "85px",
+  right: "10px", // ✅ 우측 여백 추가
+  top: "12px",   // ✅ 상단 여백 추가
+  bottom: "12px", // ✅ 하단 여백 추가
+  width: "65px",  // ✅ 너비 약간 축소
+  backgroundColor: "#ff4d4d",
+  borderRadius: "16px", // ✅ 크기에 맞춰 둥근 모서리 조정
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
@@ -253,7 +255,7 @@ const historyCardStyle = {
   borderRadius: "24px",
   boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
   cursor: "pointer",
-  border: "1px solid #f2f2f2",
+  border: "1px solid #eee", // ✅ 보더 색상을 약간 더 연하게 조정
   position: "relative",
   zIndex: 1,
 };
