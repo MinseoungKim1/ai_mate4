@@ -73,67 +73,117 @@ exports.removeFromQueue = async (email) => {
   }
 };
 
+const ntfyService = require('./ntfyService');
+const { ChatAnalysis } = require('../models');
+
 /**
- * 매칭 시도 (pending 상태 유저 2명 매칭)
+ * 매칭 시도 (점수 기반 매칭)
  */
 exports.tryMatch = async () => {
   try {
-    // ✅ pending 상태인 유저 2명 찾기 (user2Id가 null인 경우)
-    const pendingUsers = await Match.findAll({
+    // ✅ pending 상태인 모든 유저 가져오기
+    const pendingMatches = await Match.findAll({
       where: {
         status: 'pending',
-        user2Id: null // 아직 매칭 안 된 유저들만
+        user2Id: null
       },
       include: [
         {
           model: User,
           as: 'user1',
-          attributes: ['email', 'nickname', 'gender', 'age', 'id'],
-          required: true
+          attributes: ['id', 'email', 'nickname', 'gender', 'age'],
+          include: [{
+              model: ChatAnalysis,
+              as: 'analyses',
+              limit: 1,
+              order: [['analyzedAt', 'DESC']]
+          }]
         }
       ],
-      limit: 2,
-      order: [['matched_at', 'ASC']] // 오래 기다린 순서대로
+      order: [['matched_at', 'ASC']]
     });
 
-    if (pendingUsers.length < 2) {
-      return null; // 매칭할 유저 부족
+    if (pendingMatches.length < 2) {
+      return null;
     }
 
-    const user1Match = pendingUsers[0];
-    const user2Match = pendingUsers[1];
+    // ✅ 점수 정보를 포함하여 리스트 정리
+    const candidates = pendingMatches.map(m => {
+        const latestAnalysis = m.user1.analyses && m.user1.analyses.length > 0 ? m.user1.analyses[0] : null;
+        return {
+            match: m,
+            user: m.user1,
+            score: latestAnalysis ? latestAnalysis.totalScore : 50 // 점수 없으면 기본값 50
+        };
+    });
 
-    // ✅ 매칭 성공! user2Id 업데이트 + 상태 변경
+    // ✅ 매칭 알고리즘: 가장 오래 기다린 유저(candidates[0])와 가장 점수가 비슷한 다른 성별의 유저 찾기
+    const user1 = candidates[0];
+    let bestMatchIndex = -1;
+    let minScoreDiff = Infinity;
+
+    for (let i = 1; i < candidates.length; i++) {
+        const user2 = candidates[i];
+        
+        // 성별이 다른 경우 우선 (비즈니스 로직에 따라 변경 가능)
+        if (user1.user.gender !== user2.user.gender) {
+            const diff = Math.abs(user1.score - user2.score);
+            if (diff < minScoreDiff) {
+                minScoreDiff = diff;
+                bestMatchIndex = i;
+            }
+        }
+    }
+
+    // 만약 다른 성별이 없으면 그냥 가장 점수 비슷한 유저와 매칭
+    if (bestMatchIndex === -1) {
+        for (let i = 1; i < candidates.length; i++) {
+            const user2 = candidates[i];
+            const diff = Math.abs(user1.score - user2.score);
+            if (diff < minScoreDiff) {
+                minScoreDiff = diff;
+                bestMatchIndex = i;
+            }
+        }
+    }
+
+    if (bestMatchIndex === -1) return null;
+
+    const user2 = candidates[bestMatchIndex];
     const roomId = `room_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-    // user1 매칭 업데이트
+    // ✅ 트랜잭션 없이 각각 업데이트 (간단하게)
     await Match.update(
-        {
-          roomId,
-          user2Id: user2Match.user1Id,
-          status: 'accepted',
-          matchedAt: new Date(),
-        },
-        { where: { id: user1Match.id } }
+        { roomId, user2Id: user2.user.id, status: 'accepted', matchedAt: new Date() },
+        { where: { id: user1.match.id } }
+    );
+    await Match.update(
+        { roomId, user2Id: user1.user.id, status: 'accepted', matchedAt: new Date() },
+        { where: { id: user2.match.id } }
     );
 
-    // user2 매칭 업데이트
-    await Match.update(
-        {
-          roomId,
-          user2Id: user1Match.user1Id,
-          status: 'accepted',
-          matched_at: new Date(),
-        },
-        { where: { id: user2Match.id } }
-    );
+    console.log(`[Match] 점수 기반 매칭 성공: ${user1.user.email}(${user1.score}) ↔ ${user2.user.email}(${user2.score})`);
 
-    console.log(`[Match] 매칭 성공! ${user1Match.user1.email} ↔ ${user2Match.user1.email} (${roomId})`);
+    // ✅ ntfy.sh 알림 전송
+    const notifyMatch = async (me, partner, myScore) => {
+        try {
+            const topic = ntfyService.generateUserTopic(me, myScore);
+            await ntfyService.publish(topic, `${partner.nickname}님과 매칭되었습니다! 채팅을 시작해보세요.`, {
+                title: '🎉 매칭 성공!',
+                tags: 'heart,party_popper'
+            });
+        } catch (e) {
+            console.error('[ntfy] Match notification failed:', e.message);
+        }
+    };
+
+    await notifyMatch(user1.user, user2.user, user1.score);
+    await notifyMatch(user2.user, user1.user, user2.score);
 
     return {
       roomId,
-      user1: user1Match.user1,
-      user2: user2Match.user1
+      user1: user1.user,
+      user2: user2.user
     };
 
   } catch (error) {

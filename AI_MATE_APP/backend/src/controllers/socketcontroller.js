@@ -8,9 +8,11 @@ module.exports = (io, socket) => {
 
   // ==================== 매칭 대기열 ====================
   socket.on("join-room", async ({ email }) => {
-    socket.userEmail = email;
-
     try {
+      const user = await userService.getUserByEmail(email);
+      socket.userEmail = email;
+      socket.userId = user.id;
+
       // ✅ DB에 매칭 대기열 추가
       const matchRequest = await matchService.addToQueue(email);
 
@@ -19,7 +21,7 @@ module.exports = (io, socket) => {
         message: "매칭 대기열에 들어갔습니다."
       });
 
-      console.log(`[Queue] 진입: ${email} (matchId: ${matchRequest.id})`);
+      console.log(`[Queue] 진입: ${email} (userId: ${user.id})`);
 
       // ✅ 주기적으로 매칭 시도 (5초마다)
       const matchInterval = setInterval(async () => {
@@ -35,7 +37,11 @@ module.exports = (io, socket) => {
               .find(s => s.userEmail === user2.email);
 
           if (user1Socket && user2Socket) {
-            console.log(`[FOUND] user1Socket: ${user1Socket?.id}, user2Socket: ${user2Socket?.id}`);  // 👈 추가
+            const ntfyService = require('../services/ntfyService');
+            
+            const getScore = (u) => (u.analyses && u.analyses.length > 0 ? u.analyses[0].totalScore : 50);
+            const user1Topic = ntfyService.generateUserTopic(user1, getScore(user1));
+            const user2Topic = ntfyService.generateUserTopic(user2, getScore(user2));
 
             // ✅ 방 입장
             user1Socket.join(roomId);
@@ -47,6 +53,7 @@ module.exports = (io, socket) => {
               partner: {
                 email: user2.email,
                 nickname: user2.nickname,
+                ntfyTopic: user2Topic
               }
             });
 
@@ -55,6 +62,7 @@ module.exports = (io, socket) => {
               partner: {
                 email: user1.email,
                 nickname: user1.nickname,
+                ntfyTopic: user1Topic
               }
             });
 
@@ -124,11 +132,11 @@ module.exports = (io, socket) => {
   // 2. 메시지 전송 (실시간 채팅)
   socket.on("send-message", async ({ roomId, text, aiCoaching = null }) => {
     try {
-      // ✅ DB에 메시지 저장
+      // ✅ DB에 메시지 저장 (ntfy 알림도 여기서 처리됨)
       const message = await historyService.saveMessage(
           roomId,
           'user',
-          socket.userEmail,
+          socket.userId,
           text,
           aiCoaching
       );

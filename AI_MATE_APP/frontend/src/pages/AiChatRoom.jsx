@@ -283,6 +283,7 @@ const containerStyle = {
   maxWidth: "420px",
   height: "95vh",
   backgroundColor: "#f8f9fb",
+  color: "#333", // ✅ 글씨색 명시적으로 지정
   borderRadius: "30px",
   overflow: "hidden",
   position: "relative",

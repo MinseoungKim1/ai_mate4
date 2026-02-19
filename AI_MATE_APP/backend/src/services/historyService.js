@@ -257,6 +257,8 @@ exports.createAiChatRoom = async (email, aiProfileId) => {
   }
 };
 
+const ntfyService = require('./ntfyService');
+
 // 실시간 메시지 저장 (Socket.io용)
 exports.saveMessage = async (chatRoomId, senderType, senderId, messageText, aiCoaching = null) => {
   try {
@@ -265,11 +267,11 @@ exports.saveMessage = async (chatRoomId, senderType, senderId, messageText, aiCo
       throw new Error("CHAT_ROOM_NOT_FOUND");
     }
 
-    // 메시지 저장
+    // 메시지 저장 (senderId는 이제 BIGINT임)
     const message = await Message.create({
       chatRoomId,
       senderType,
-      senderId: senderType === 'user' ? senderId : null,
+      senderId, 
       messageText,
       aiCoaching,
     });
@@ -277,6 +279,41 @@ exports.saveMessage = async (chatRoomId, senderType, senderId, messageText, aiCo
     // 채팅방 메시지 카운트 증가
     await chatRoom.increment('messageCount');
     await chatRoom.update({ lastMessageAt: new Date() });
+
+    // ✅ ntfy.sh 알림 전송 (상대방에게 보냄)
+    // senderId가 현재 사용자의 ID이므로, 상대방의 ID를 찾아야 함
+    const partnerId = chatRoom.userId === senderId ? chatRoom.partnerId : chatRoom.userId;
+
+    if (partnerId) {
+      try {
+          const partner = await User.findOne({
+              where: { id: partnerId },
+              include: [{
+                  model: ChatAnalysis,
+                  as: 'analyses',
+                  limit: 1,
+                  order: [['analyzedAt', 'DESC']]
+              }]
+          });
+
+          const sender = await User.findByPk(senderId);
+
+          if (partner && sender) {
+              const latestScore = partner.analyses && partner.analyses.length > 0 
+                  ? partner.analyses[0].totalScore 
+                  : 50;
+              
+              const topic = ntfyService.generateUserTopic(partner, latestScore);
+              await ntfyService.publish(topic, messageText, {
+                  title: `${sender.nickname}님의 새 메시지`,
+                  tags: 'incoming_envelope'
+              });
+              console.log(`[ntfy] Published to partner's topic: ${topic}`);
+          }
+      } catch (ntfyError) {
+          console.error('[ntfy] Notification failed:', ntfyError.message);
+      }
+    }
 
     return message;
 
