@@ -58,7 +58,7 @@ const Payment = () => {
       },
       orderId: `order_${Math.random().toString(36).slice(2, 11)}`,
       orderName: currentPlan.name,
-      successUrl: `${window.location.origin}/payment-success`, // 성공 시 갈 곳
+      successUrl: `${window.location.origin}/payment-success?planId=${currentPlan.id}`, // 성공 시 갈 곳
       failUrl: `${window.location.origin}/payment-fail`,       // 실패 시 갈 곳
       customerName: localStorage.getItem("nickname") || "익명고객",
     });
